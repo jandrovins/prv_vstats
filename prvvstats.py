@@ -2,6 +2,7 @@
 """prv-vstats: Paraver trace statistical analysis tool."""
 
 import argparse
+import math
 import sys
 from pathlib import Path
 
@@ -22,48 +23,77 @@ def build_color_palette(task_names):
 
 
 def plot_figure(stats_result, output_path):
-    df = stats_result["_df"]
+    df = stats_result["_df"].copy()
     global_df = stats_result["global"]
     per_thread_df = stats_result["per_thread"]
 
-    task_names = sorted(df["task"].unique())
+    # Tasks ordered by pct_timeline descending (most significant first)
+    task_names = global_df["task"].tolist()
     palette = build_color_palette(task_names)
-
     threads = sorted(df["thread"].unique())
 
-    fig, (ax_top, ax_bot) = plt.subplots(
-        2, 1,
-        figsize=(max(12, len(task_names) * 2), 10),
-        gridspec_kw={"height_ratios": [2, 1.5]},
+    # --- Bin intervals into 100ms windows relative to first event ---
+    bin_size_ns = 100_000_000  # 100 ms
+    t0_ns = int(df["start_ns"].min())
+    df["bin_idx"] = (df["start_ns"] - t0_ns) // bin_size_ns
+
+    n_tasks = len(task_names)
+    n_cols = 2
+    n_task_rows = math.ceil(n_tasks / n_cols)
+    bar_height_inches = max(4, len(threads) * 0.12)
+
+    fig = plt.figure(figsize=(22, n_task_rows * 3 + bar_height_inches))
+    gs = fig.add_gridspec(
+        n_task_rows + 1, n_cols,
+        height_ratios=[3] * n_task_rows + [bar_height_inches],
+        hspace=0.55, wspace=0.35,
     )
 
-    # --- Top panel: violin plot per task type ---
-    positions = range(len(task_names))
+    # --- Per-task-type subplots: one violin per 100ms bin ---
     for i, task in enumerate(task_names):
-        data = df[df["task"] == task]["duration_ms"].values
-        if len(data) < 2:
-            ax_top.scatter([i], data, color=palette[task], zorder=3)
-            continue
-        parts = ax_top.violinplot(data, positions=[i], showmeans=False,
-                                   showmedians=False, showextrema=True)
-        for pc in parts["bodies"]:
-            pc.set_facecolor(palette[task])
-            pc.set_alpha(0.7)
-        for part_name in ("cbars", "cmins", "cmaxes"):
-            if part_name in parts:
-                parts[part_name].set_edgecolor(palette[task])
-        # Mean dot
-        ax_top.scatter([i], [data.mean()], color="white", edgecolors=palette[task],
-                       zorder=3, s=40, linewidths=1.5, label="_nolegend_")
+        row_idx = i // n_cols
+        col_idx = i % n_cols
+        ax = fig.add_subplot(gs[row_idx, col_idx])
 
-    ax_top.set_xticks(list(positions))
-    ax_top.set_xticklabels(task_names, rotation=30, ha="right", fontsize=8)
-    ax_top.set_ylabel("Duration (ms)")
-    ax_top.set_title("Task duration distribution (violin, dot = mean)")
-    ax_top.grid(axis="y", linestyle="--", alpha=0.4)
+        task_df = df[df["task"] == task]
+        bins = sorted(task_df["bin_idx"].unique())
+        color = palette[task]
 
-    # --- Bottom panel: stacked horizontal bar chart ---
-    # For each thread, sum pct_timeline per task
+        for j, bin_idx in enumerate(bins):
+            data = task_df[task_df["bin_idx"] == bin_idx]["duration_ms"].values
+            if len(data) >= 2:
+                parts = ax.violinplot(data, positions=[j], showmeans=False,
+                                      showmedians=False, showextrema=True,
+                                      widths=0.75)
+                for pc in parts["bodies"]:
+                    pc.set_facecolor(color)
+                    pc.set_alpha(0.65)
+                for part_name in ("cbars", "cmins", "cmaxes"):
+                    if part_name in parts:
+                        parts[part_name].set_edgecolor(color)
+                ax.scatter([j], [data.mean()], color="white", edgecolors=color,
+                           zorder=3, s=18, linewidths=1.2)
+            elif len(data) == 1:
+                ax.scatter([j], data, color=color, zorder=3, s=18)
+
+        # X-axis ticks: at most ~8 labels to avoid crowding
+        n_bins = len(bins)
+        step = max(1, n_bins // 8)
+        tick_pos = list(range(0, n_bins, step))
+        tick_labels = [f"{bins[p] * 100}ms" for p in tick_pos]
+        ax.set_xticks(tick_pos)
+        ax.set_xticklabels(tick_labels, rotation=40, ha="right", fontsize=6)
+        ax.set_ylabel("ms", fontsize=7)
+        ax.set_title(task, fontsize=8, color=color, fontweight="bold")
+        ax.grid(axis="y", linestyle="--", alpha=0.35)
+        ax.set_xlim(-0.5, n_bins - 0.5)
+
+    # Hide any unused subplot slots
+    for i in range(n_tasks, n_task_rows * n_cols):
+        fig.add_subplot(gs[i // n_cols, i % n_cols]).set_visible(False)
+
+    ax_bot = fig.add_subplot(gs[n_task_rows, :])
+
     bar_data = {}
     for task in task_names:
         bar_data[task] = []
@@ -87,12 +117,10 @@ def plot_figure(stats_result, output_path):
     ax_bot.set_xlim(0, max(100, lefts.max() * 1.05))
     ax_bot.grid(axis="x", linestyle="--", alpha=0.4)
 
-    # Legend outside
     handles = [mpatches.Patch(color=palette[t], label=t) for t in task_names]
     ax_bot.legend(handles=handles, bbox_to_anchor=(1.01, 1), loc="upper left",
                   fontsize=7, frameon=True)
 
-    fig.tight_layout()
     fig.savefig(output_path, dpi=150, bbox_inches="tight")
     print(f"Figure saved to {output_path}")
 
@@ -104,6 +132,8 @@ def main():
     parser.add_argument("prv", help="Path to .prv trace file")
     parser.add_argument("--event-type", type=int, default=11,
                         help="Event type ID to analyse (default: 11, nOS-V task type)")
+    parser.add_argument("--filter-at-parse", action="store_true",
+                        help="Ignore all non-selected --event-type events while reading .prv")
     parser.add_argument("--output", default="stats.png",
                         help="Output figure path (default: stats.png)")
     parser.add_argument("--llm-output", metavar="FILE", default=None,
@@ -119,7 +149,10 @@ def main():
     row_path = prv_path.with_suffix(".row")
 
     print(f"Parsing {prv_path} ...")
-    duration_ns, nrows, events = parse_prv(prv_path)
+    parse_event_filter = args.event_type if args.filter_at_parse else None
+    if parse_event_filter is not None:
+        print(f"  Parse-time filter enabled: keeping only event type {parse_event_filter}")
+    duration_ns, nrows, events = parse_prv(prv_path, event_type_filter=parse_event_filter)
     print(f"  Duration: {duration_ns / 1e9:.3f} s  |  Rows: {nrows}  |  Events: {len(events)}")
 
     pcf_data = {}

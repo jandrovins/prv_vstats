@@ -5,7 +5,8 @@ NAME
        prvvstats - Paraver trace statistical analysis tool
 
 SYNOPSIS
-       python prvvstats.py trace.prv [--event-type N] [--output FILE]
+       python prvvstats.py trace.prv [--event-type N] [--filter-at-parse]
+                                     [--output FILE]
                                      [--llm-output FILE]
 
 DESCRIPTION
@@ -36,6 +37,14 @@ OPTIONS
               Numeric event type ID to analyse.  Defaults to 11 (nOS-V task
               type of the running thread).  Available IDs and their labels
               are listed in the EVENT_TYPE sections of the .pcf file.
+
+       --filter-at-parse
+              Opt-in parser filtering mode.  When enabled, the reader keeps
+              only events matching --event-type while parsing trace.prv and
+              ignores all other event types.  This can reduce memory use and
+              parsing time on traces containing many unrelated event types.
+              If omitted, all event types are read and filtering happens
+              later during interval reconstruction.
 
        --output FILE
               Path for the output figure.  Accepts any extension supported

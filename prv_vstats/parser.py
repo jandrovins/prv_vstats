@@ -86,10 +86,13 @@ def parse_row(row_path):
     return names
 
 
-def parse_prv(prv_path):
+def parse_prv(prv_path, event_type_filter=None):
     """
     Returns (duration_ns: int, nrows: int, events: list[tuple])
     Each event tuple: (row: int, time: int, event_type: int, value: int)
+
+    If event_type_filter is not None, only events with that event type are
+    retained while parsing.
     """
     duration_ns = 0
     nrows = 0
@@ -147,7 +150,8 @@ def parse_prv(prv_path):
                 for i in range(0, len(tail) - 1, 2):
                     etype = int(tail[i])
                     evalue = int(tail[i + 1])
-                    events.append((row, time, etype, evalue))
+                    if event_type_filter is None or etype == event_type_filter:
+                        events.append((row, time, etype, evalue))
             except (ValueError, IndexError):
                 continue
 
