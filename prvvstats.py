@@ -134,6 +134,8 @@ def main():
                         help="Event type ID to analyse (default: 11, nOS-V task type)")
     parser.add_argument("--filter-at-parse", action="store_true",
                         help="Ignore all non-selected --event-type events while reading .prv")
+    parser.add_argument("--progress", action="store_true",
+                        help="Show live progress while loading the .prv file")
     parser.add_argument("--output", default="stats.png",
                         help="Output figure path (default: stats.png)")
     parser.add_argument("--llm-output", metavar="FILE", default=None,
@@ -152,7 +154,11 @@ def main():
     parse_event_filter = args.event_type if args.filter_at_parse else None
     if parse_event_filter is not None:
         print(f"  Parse-time filter enabled: keeping only event type {parse_event_filter}")
-    duration_ns, nrows, events = parse_prv(prv_path, event_type_filter=parse_event_filter)
+    duration_ns, nrows, events = parse_prv(
+        prv_path,
+        event_type_filter=parse_event_filter,
+        show_progress=args.progress,
+    )
     print(f"  Duration: {duration_ns / 1e9:.3f} s  |  Rows: {nrows}  |  Events: {len(events)}")
 
     pcf_data = {}

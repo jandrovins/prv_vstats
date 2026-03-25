@@ -6,6 +6,7 @@ NAME
 
 SYNOPSIS
        python prvvstats.py trace.prv [--event-type N] [--filter-at-parse]
+                                     [--progress]
                                      [--output FILE]
                                      [--llm-output FILE]
 
@@ -45,6 +46,13 @@ OPTIONS
               parsing time on traces containing many unrelated event types.
               If omitted, all event types are read and filtering happens
               later during interval reconstruction.
+
+       --progress
+              Show live loading progress while parsing trace.prv.  The
+              progress line includes percentage loaded, bytes read/total,
+              estimated remaining time, read throughput, line and event
+              counters, and process RSS relative to total system memory.
+              Progress is printed to standard error.
 
        --output FILE
               Path for the output figure.  Accepts any extension supported

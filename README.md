@@ -14,7 +14,7 @@ pip install -r requirements.txt
 ## Usage
 
 ```
-python prvvstats.py <trace.prv> [--event-type N] [--filter-at-parse] [--output FILE] [--llm-output FILE]
+python prvvstats.py <trace.prv> [--event-type N] [--filter-at-parse] [--progress] [--output FILE] [--llm-output FILE]
 ```
 
 | Argument | Default | Description |
@@ -22,6 +22,7 @@ python prvvstats.py <trace.prv> [--event-type N] [--filter-at-parse] [--output F
 | `trace.prv` | *(required)* | Path to the Paraver trace file |
 | `--event-type N` | `11` | Event type ID to analyse (see PCF for IDs) |
 | `--filter-at-parse` | off | Ignore non-selected event types while reading `.prv` (opt-in speed/memory mode) |
+| `--progress` | off | Show live loading progress for `.prv` (percent, ETA, throughput, counts, memory) |
 | `--output FILE` | `stats.png` | Output figure path |
 | `--llm-output FILE` | — | Write LLM text export to FILE (`-` for stdout) |
 
