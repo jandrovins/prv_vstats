@@ -58,3 +58,11 @@ prv-vstats/
 ```
 
 See `MANUAL.md` for the full reference manual.
+
+# References 
+
+- Ovni docs: https://ovni.readthedocs.io/en/master/
+- Ovni repo: https://github.com/bsc-pm/ovni/
+- nOS-V: https://github.com/bsc-pm/nos-v
+- OmpSs-2 LLVM Compiler: https://github.com/bsc-pm/llvm
+
